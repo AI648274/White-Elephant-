@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>White Elephant Number Generator</title>
+<style>
+body { font-family: Arial; max-width: 500px; margin: 40px auto; }
+input, button { font-size: 18px; padding: 10px; width: 100%; margin-top: 10px; }
+#result { padding: 20px; background: #f0f0f0; margin-top: 20px; display:none; }
+</style>
+</head>
+<body>
+
+<h2>White Elephant – Get Your Number</h2>
+<p>Enter your name to receive a unique random number.</p>
+
+<input id="nameInput" placeholder="Your name">
+<button onclick="assignNumber()">Get Number</button>
+
+<div id="result"></div>
+
+<script>
+const repoOwner = "YOUR_USERNAME";   // <-- CHANGE THIS
+const repoName  = "white-elephant-randomizer"; // <-- CHANGE IF NEEDED
+const dataFile  = "data.json";
+
+async function loadData() {
+    let res = await fetch(`https://raw.githubusercontent.com/${repoOwner}/${repoName}/main/${dataFile}`);
+    if (!res.ok) return { people: [], usedNumbers: [] };
+    return await res.json();
+}
+
+async function saveData(data, sha) {
+    const token = "YOUR_GITHUB_TOKEN"; // <-- ADD YOUR TOKEN HERE
+
+    await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/contents/${dataFile}`, {
+        method: "PUT",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `token ${token}`
+        },
+        body: JSON.stringify({
+            message: "update data",
+            content: btoa(JSON.stringify(data, null, 2)),
+            sha: sha
+        })
+    });
+}
+
+async function assignNumber() {
+    const name = document.getElementById("nameInput").value.trim();
+    if (!name) return alert("Please enter your name.");
+
+    let fileInfo = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/contents/${dataFile}`);
+    let sha = null;
+    let data = null;
+
+    if (fileInfo.ok) {
+        let json = await fileInfo.json();
+        sha = json.sha;
+        data = JSON.parse(atob(json.content));
+    } else {
+        data = { people: [], usedNumbers: [] };
+    }
+
+    if (data.people.find(p => p.name.toLowerCase() === name.toLowerCase())) {
+        let p = data.people.find(p => p.name.toLowerCase() === name.toLowerCase());
+        showResult(p.number, true);
+        return;
+    }
+
+    let num;
+    do {
+        num = Math.floor(Math.random() * 1000) + 1;
+    } while (data.usedNumbers.includes(num));
+
+    data.usedNumbers.push(num);
+    data.people.push({ name: name, number: num });
+
+    await saveData(data, sha);
+    showResult(num, false);
+}
+
+function showResult(num, existing) {
+    let div = document.getElementById("result");
+    div.style.display = "block";
+    div.innerHTML = existing ?
+        `Welcome back! Your number is <b>${num}</b>.` :
+        `Your White Elephant number is: <h2>${num}</h2>`;
+}
+</script>
+
+</body>
+</html>
+
